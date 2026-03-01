@@ -7,6 +7,8 @@ __pycache__/
 logs/
 output/
 visual_results/
+glove
+checkpoints
 
 *.log
 nohup.out

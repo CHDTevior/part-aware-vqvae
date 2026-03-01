@@ -36,7 +36,13 @@ If you use a different CUDA version, replace step 2 with the matching PyTorch co
 scripts/link_large_data.sh /path/to/HumanML3D
 ```
 
-2. Put checkpoints in paths expected by the original code (same as MMM).
+2. Link shared training assets (`glove`, `checkpoints`) from your existing workspace:
+
+```bash
+ln -sfn /your/path/to/MMM/glove glove
+ln -sfn /your/path/to/MMM/checkpoints checkpoints
+```
+
 3. Run partition analysis if needed:
 
 ```bash
@@ -45,7 +51,13 @@ python partition_analysis/analyze_skeleton_partition.py \
   --output_dir ./partition_analysis
 ```
 
-4. Train part-aware VQ-VAE:
+4. Optional smoke test (no full training):
+
+```bash
+python scripts/smoke_test.py --device cpu
+```
+
+5. Train part-aware VQ-VAE:
 
 ```bash
 python -u train_vq.py \
@@ -55,7 +67,7 @@ python -u train_vq.py \
   --stride-t 2
 ```
 
-5. Slurm run:
+6. Slurm run:
 
 ```bash
 sbatch train_vq_sbatch.sh
@@ -64,3 +76,12 @@ sbatch train_vq_sbatch.sh
 ## Notes
 - Code is intentionally kept close to your original implementation for reproducibility.
 - `partition-file` is optional. Without it, the fallback static partition in `models/vqvae.py` is used.
+- Real training requires `glove/our_vab_*.{npy,pkl}` and `checkpoints/t2m/Comp_v6_KLD005/opt.txt`.
+- If `sbatch` is pending with `QOSMaxNodePerUserLimit`, run inside an existing allocation instead:
+
+```bash
+srun --jobid=<running_jobid> --ntasks=1 --gres=gpu:1 --cpus-per-task=16 --mem=120G \
+  bash -lc 'source ~/.bashrc && conda activate tlcontrol && cd /path/to/part-aware-vqvae && python -u train_vq.py ...'
+```
+
+- Keep `--ntasks=1` for single-process training to avoid duplicate process collisions on output folders.
