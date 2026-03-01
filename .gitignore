@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.ipynb_checkpoints/
+
+logs/
+output/
+visual_results/
+
+*.log
+nohup.out
+
+.vscode/
+.DS_Store

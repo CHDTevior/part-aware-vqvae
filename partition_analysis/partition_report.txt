@@ -1,0 +1,37 @@
+=== Skeleton Partition Analysis Report ===
+Data root: ./dataset/HumanML3D
+# motions: 23368
+# parts: 6
+Cluster method: average
+
+Part segmentation (dim indices):
+  Part 0: 143 dims -> [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19, 20, 21, 28, 29, 30, 37]...
+  Part 1: 24 dims -> [55, 56, 57, 61, 62, 63, 169, 170, 171, 172, 173, 174, 181, 182, 183, 184, 185, 186, 247, 248]...
+  Part 2: 24 dims -> [58, 59, 60, 64, 65, 66, 175, 176, 177, 178, 179, 180, 187, 188, 189, 190, 191, 192, 250, 251]...
+  Part 3: 24 dims -> [22, 23, 24, 31, 32, 33, 103, 104, 105, 106, 107, 108, 121, 122, 123, 124, 125, 126, 214, 215]...
+  Part 4: 24 dims -> [25, 26, 27, 34, 35, 36, 109, 110, 111, 112, 113, 114, 127, 128, 129, 130, 131, 132, 217, 218]...
+  Part 5: 24 dims -> [13, 14, 15, 16, 17, 18, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 205, 206]...
+
+Joint cluster labels:
+  Joint 0: cluster 1
+  Joint 1: cluster 1
+  Joint 2: cluster 1
+  Joint 3: cluster 1
+  Joint 4: cluster 6
+  Joint 5: cluster 6
+  Joint 6: cluster 1
+  Joint 7: cluster 4
+  Joint 8: cluster 5
+  Joint 9: cluster 1
+  Joint 10: cluster 4
+  Joint 11: cluster 5
+  Joint 12: cluster 1
+  Joint 13: cluster 1
+  Joint 14: cluster 1
+  Joint 15: cluster 1
+  Joint 16: cluster 1
+  Joint 17: cluster 1
+  Joint 18: cluster 2
+  Joint 19: cluster 3
+  Joint 20: cluster 2
+  Joint 21: cluster 3
