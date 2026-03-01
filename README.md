@@ -13,8 +13,14 @@ This repo packages your VAE/VQ training + evaluation code from `MMM` together wi
 
 ## Quick Start
 1. Create environment from `environment.yml`.
-2. Put datasets/checkpoints in paths expected by the original code (same as MMM).
-3. Run partition analysis if needed:
+2. For large datasets, use symlinks instead of copying:
+
+```bash
+scripts/link_large_data.sh /path/to/HumanML3D
+```
+
+3. Put checkpoints in paths expected by the original code (same as MMM).
+4. Run partition analysis if needed:
 
 ```bash
 python partition_analysis/analyze_skeleton_partition.py \
@@ -22,7 +28,7 @@ python partition_analysis/analyze_skeleton_partition.py \
   --output_dir ./partition_analysis
 ```
 
-4. Train part-aware VQ-VAE:
+5. Train part-aware VQ-VAE:
 
 ```bash
 python -u train_vq.py \
@@ -32,7 +38,7 @@ python -u train_vq.py \
   --stride-t 2
 ```
 
-5. Slurm run:
+6. Slurm run:
 
 ```bash
 sbatch train_vq_sbatch.sh
