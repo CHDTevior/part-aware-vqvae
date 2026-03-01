@@ -57,7 +57,36 @@ python partition_analysis/analyze_skeleton_partition.py \
 python scripts/smoke_test.py --device cpu
 ```
 
-5. Train part-aware VQ-VAE:
+5. Offline evaluation + visualization (encoder latent / quantized latent / codebook / collapse diagnostics):
+
+```bash
+python scripts/offline_vq_eval.py \
+  --ckpt output/vq/<your_run>/net_last.pth \
+  --device cuda \
+  --num-batches 40 \
+  --out-dir offline_eval/<eval_name>
+```
+
+Run training-style metrics (FID/diversity/R-precision) in the same script:
+
+```bash
+python scripts/offline_vq_eval.py \
+  --ckpt output/vq/<your_run>/net_last.pth \
+  --device cuda \
+  --run-training-style-eval \
+  --out-dir offline_eval/<eval_name>
+```
+
+Generated files include:
+- `encoder_latent_pca.png` (Choice 1: pre-quant encoder manifold)
+- `quantized_latent_pca.png` (Choice 2: post-quant latent clusters)
+- `codebook_pca.png` (Choice 3: codebook health, dead codes marked as `x`)
+- `code_usage_heatmap.png` (usage concentration / dead-code risk)
+- `recon_vs_commit.png` (commit vs recon relationship)
+- `nn_recon_ratio_hist.png` (nearest-neighbor reconstruction collapse check)
+- `metrics.json` (all numeric diagnostics: perplexity, dead codes, commit/recon, duplicates, nn checks, optional FID/diversity/top-k)
+
+6. Train part-aware VQ-VAE:
 
 ```bash
 python -u train_vq.py \
@@ -67,7 +96,7 @@ python -u train_vq.py \
   --stride-t 2
 ```
 
-6. Slurm run:
+7. Slurm run:
 
 ```bash
 sbatch train_vq_sbatch.sh

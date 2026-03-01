@@ -7,6 +7,7 @@ __pycache__/
 logs/
 output/
 visual_results/
+offline_eval/
 glove
 checkpoints
 
