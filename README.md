@@ -11,16 +11,33 @@ This repo packages your VAE/VQ training + evaluation code from `MMM` together wi
   - script: `partition_analysis/analyze_skeleton_partition.py`
   - partitions: `partition_analysis/skeleton_partition.json`, `partition_analysis/skeleton_partition2.json`
 
+## Environment (pip-first)
+Use `conda` only to create an isolated env, then install packages via `pip`.
+
+```bash
+# 1) Create and activate env
+conda create -n tlcontrol python=3.10 -y
+conda activate tlcontrol
+
+# 2) Install PyTorch (CUDA 11.8 example)
+pip install --upgrade pip
+pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu118
+
+# 3) Install project dependencies
+pip install -r environment.txt
+```
+
+If you use a different CUDA version, replace step 2 with the matching PyTorch command from pytorch.org.
+
 ## Quick Start
-1. Create environment from `environment.yml`.
-2. For large datasets, use symlinks instead of copying:
+1. For large datasets, use symlinks instead of copying:
 
 ```bash
 scripts/link_large_data.sh /path/to/HumanML3D
 ```
 
-3. Put checkpoints in paths expected by the original code (same as MMM).
-4. Run partition analysis if needed:
+2. Put checkpoints in paths expected by the original code (same as MMM).
+3. Run partition analysis if needed:
 
 ```bash
 python partition_analysis/analyze_skeleton_partition.py \
@@ -28,7 +45,7 @@ python partition_analysis/analyze_skeleton_partition.py \
   --output_dir ./partition_analysis
 ```
 
-5. Train part-aware VQ-VAE:
+4. Train part-aware VQ-VAE:
 
 ```bash
 python -u train_vq.py \
@@ -38,7 +55,7 @@ python -u train_vq.py \
   --stride-t 2
 ```
 
-6. Slurm run:
+5. Slurm run:
 
 ```bash
 sbatch train_vq_sbatch.sh

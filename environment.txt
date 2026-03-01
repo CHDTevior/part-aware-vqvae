@@ -1,0 +1,20 @@
+# Part-Aware VQVAE pip dependencies
+# Note: install torch/torchvision first according to your CUDA version.
+
+numpy==1.26.4
+scipy==1.13.0
+matplotlib==3.8.4
+plotly==5.19.0
+PyYAML==6.0.1
+tqdm==4.66.4
+tensorboard==2.16.2
+protobuf==3.20.3
+
+einops==0.8.0
+ftfy==6.2.0
+regex==2024.5.15
+gdown==5.2.0
+transformers==4.41.2
+
+# OpenAI CLIP (import clip)
+git+https://github.com/openai/CLIP.git
