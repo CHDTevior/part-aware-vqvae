@@ -311,7 +311,7 @@ def maybe_run_training_style_eval(args: argparse.Namespace, model: HumanVQVAE, l
         w_vectorizer,
         unit_length=2 ** args.down_t,
         num_workers=args.num_workers,
-        shuffle=False,
+        shuffle=True,
     )
     wrapper_opt = get_opt(dataset_opt_path, torch.device(args.device))
     eval_wrapper = EvaluatorModelWrapper(wrapper_opt)
