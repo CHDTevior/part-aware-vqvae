@@ -155,7 +155,7 @@ class VQVAE_251(nn.Module):
             # 编码
             z_e = self.limb_encoders[i](x_part)        # (B, D, T_latent)
 
-            z_e = z_e / torch.norm(z_e, dim=[1, 2]).unsqueeze(1).unsqueeze(1) #norm
+            # z_e = z_e / torch.norm(z_e, dim=[1, 2]).unsqueeze(1).unsqueeze(1) #norm
 
             # 量化（先 flatten）
             z_e_T = z_e.permute(0, 2, 1).contiguous()  # (B, T_latent, D)
@@ -185,7 +185,7 @@ class VQVAE_251(nn.Module):
             x_current = self.preprocess(x_current)
             x_feature = self.limb_encoders[i](x_current)
             
-            x_feature = x_feature / torch.norm(x_feature, dim=[1, 2]).unsqueeze(1).unsqueeze(1) 
+            # x_feature = x_feature / torch.norm(x_feature, dim=[1, 2]).unsqueeze(1).unsqueeze(1) 
             
             x_s.append(x_feature)
         if not in_idx_format:
