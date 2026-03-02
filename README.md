@@ -8,7 +8,8 @@ This repo packages your VAE/VQ training + evaluation code from `MMM` together wi
 - Slurm launcher: `train_vq_sbatch.sh`
 - Core modules: `models/`, `dataset/`, `utils/`, `options/`, `exit/`
 - Partition analysis:
-  - script: `partition_analysis/analyze_skeleton_partition.py`
+  - script: `partition_analysis/analyze_skeleton_partition.py` (control-oriented, new)
+  - legacy script: `partition_analysis/old_analyze_skeleton_partition.py`
   - partitions: `partition_analysis/skeleton_partition.json`, `partition_analysis/skeleton_partition2.json`
 
 ## Environment (pip-first)
@@ -48,6 +49,11 @@ ln -sfn /your/path/to/MMM/checkpoints checkpoints
 ```bash
 python partition_analysis/analyze_skeleton_partition.py \
   --data_root ./dataset/HumanML3D \
+  --n_parts 6 \
+  --feature_mode relative_parent \
+  --max_lag 4 \
+  --add_contact_part \
+  --sync_primary_partition \
   --output_dir ./partition_analysis
 ```
 
