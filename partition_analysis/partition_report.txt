@@ -1,37 +1,96 @@
-=== Skeleton Partition Analysis Report ===
-Data root: ./dataset/HumanML3D
-# motions: 23368
-# parts: 6
-Cluster method: average
+=== Control-Oriented Skeleton Partition Report ===
+Data root: /scratch/ts1v23/workspace/part-aware-vqvae/dataset/HumanML3D
+Motions loaded: 23368
+Feature mode: relative_parent
+Parent delta rot6d: False
+Parent delta vel: False
+Lagged correlation max_lag: 4
+Initial cluster method: average
+Chain target mode: majority
+Target n_parts: 6
+Standalone contact part: False
+Overlap preset: boundary_v1
+Parent map (joint->parent): 0->-1, 1->0, 2->0, 3->0, 4->1, 5->2, 6->3, 7->4, 8->5, 9->6, 10->7, 11->8, 12->9, 13->9, 14->9, 15->12, 16->13, 17->14, 18->16, 19->17, 20->18, 21->19
 
-Part segmentation (dim indices):
-  Part 0: 143 dims -> [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 19, 20, 21, 28, 29, 30, 37]...
-  Part 1: 24 dims -> [55, 56, 57, 61, 62, 63, 169, 170, 171, 172, 173, 174, 181, 182, 183, 184, 185, 186, 247, 248]...
-  Part 2: 24 dims -> [58, 59, 60, 64, 65, 66, 175, 176, 177, 178, 179, 180, 187, 188, 189, 190, 191, 192, 250, 251]...
-  Part 3: 24 dims -> [22, 23, 24, 31, 32, 33, 103, 104, 105, 106, 107, 108, 121, 122, 123, 124, 125, 126, 214, 215]...
-  Part 4: 24 dims -> [25, 26, 27, 34, 35, 36, 109, 110, 111, 112, 113, 114, 127, 128, 129, 130, 131, 132, 217, 218]...
-  Part 5: 24 dims -> [13, 14, 15, 16, 17, 18, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 205, 206]...
+Post-processing chain fixes:
+  - left_leg: joints [1, 4, 7, 10] labels [1, 6, 5, 5] -> 5
+  - right_leg: joints [2, 5, 8, 11] labels [1, 4, 3, 3] -> 3
+  - right_arm: joints [14, 17, 19, 21] labels [2, 6, 2, 2] -> 2
 
-Joint cluster labels:
-  Joint 0: cluster 1
-  Joint 1: cluster 1
-  Joint 2: cluster 1
-  Joint 3: cluster 1
-  Joint 4: cluster 6
-  Joint 5: cluster 6
-  Joint 6: cluster 1
-  Joint 7: cluster 4
-  Joint 8: cluster 5
-  Joint 9: cluster 1
-  Joint 10: cluster 4
-  Joint 11: cluster 5
-  Joint 12: cluster 1
-  Joint 13: cluster 1
-  Joint 14: cluster 1
-  Joint 15: cluster 1
-  Joint 16: cluster 1
-  Joint 17: cluster 1
-  Joint 18: cluster 2
-  Joint 19: cluster 3
-  Joint 20: cluster 2
-  Joint 21: cluster 3
+Overlap events:
+  - root/pelvis[J00, part 0] -> left_hip[J01, part 4], added_dims=7
+  - root/pelvis[J00, part 0] -> right_hip[J02, part 2], added_dims=7
+  - spine1[J03, part 0] -> left_hip[J01, part 4], added_dims=12
+  - spine1[J03, part 0] -> right_hip[J02, part 2], added_dims=12
+  - spine1[J03, part 0] -> spine2[J06, part 1], added_dims=12
+  - spine2[J06, part 1] -> left_hip[J01, part 4], added_dims=12
+  - spine2[J06, part 1] -> right_hip[J02, part 2], added_dims=12
+  - spine2[J06, part 1] -> neck[J12, part 3], added_dims=12
+  - neck[J12, part 3] -> spine2[J06, part 1], added_dims=12
+  - neck[J12, part 3] -> head[J15, part 5], added_dims=12
+  - left_collar[J13, part 1] -> neck[J12, part 3], added_dims=12
+  - right_collar[J14, part 1] -> neck[J12, part 3], added_dims=12
+
+Joint labels:
+  J00    root/pelvis -> part 0
+  J01       left_hip -> part 4
+  J02      right_hip -> part 2
+  J03         spine1 -> part 0
+  J04      left_knee -> part 4
+  J05     right_knee -> part 2
+  J06         spine2 -> part 1
+  J07     left_ankle -> part 4
+  J08    right_ankle -> part 2
+  J09         spine3 -> part 3
+  J10      left_foot -> part 4
+  J11     right_foot -> part 2
+  J12           neck -> part 3
+  J13    left_collar -> part 1
+  J14   right_collar -> part 1
+  J15           head -> part 5
+  J16  left_shoulder -> part 1
+  J17 right_shoulder -> part 1
+  J18     left_elbow -> part 1
+  J19    right_elbow -> part 1
+  J20     left_wrist -> part 1
+  J21    right_wrist -> part 1
+
+Part summary:
+  Part 0: 19 dims
+    base joints: J0(root/pelvis), J3(spine1)
+    overlap source joints: (none)
+    effective joints (base U overlap): J0(root/pelvis), J3(spine1)
+  Part 1: 132 dims
+    base joints: J6(spine2), J13(left_collar), J14(right_collar), J16(left_shoulder), J17(right_shoulder), J18(left_elbow), J19(right_elbow), J20(left_wrist), J21(right_wrist)
+    overlap source joints: J3(spine1), J12(neck)
+    effective joints (base U overlap): J3(spine1), J6(spine2), J12(neck), J13(left_collar), J14(right_collar), J16(left_shoulder), J17(right_shoulder), J18(left_elbow), J19(right_elbow), J20(left_wrist), J21(right_wrist)
+  Part 2: 81 dims
+    base joints: J2(right_hip), J5(right_knee), J8(right_ankle), J11(right_foot)
+    overlap source joints: J0(root/pelvis), J3(spine1), J6(spine2)
+    effective joints (base U overlap): J0(root/pelvis), J2(right_hip), J3(spine1), J5(right_knee), J6(spine2), J8(right_ankle), J11(right_foot)
+  Part 3: 60 dims
+    base joints: J9(spine3), J12(neck)
+    overlap source joints: J6(spine2), J13(left_collar), J14(right_collar)
+    effective joints (base U overlap): J6(spine2), J9(spine3), J12(neck), J13(left_collar), J14(right_collar)
+  Part 4: 81 dims
+    base joints: J1(left_hip), J4(left_knee), J7(left_ankle), J10(left_foot)
+    overlap source joints: J0(root/pelvis), J3(spine1), J6(spine2)
+    effective joints (base U overlap): J0(root/pelvis), J1(left_hip), J3(spine1), J4(left_knee), J6(spine2), J7(left_ankle), J10(left_foot)
+  Part 5: 24 dims
+    base joints: J15(head)
+    overlap source joints: J12(neck)
+    effective joints (base U overlap): J12(neck), J15(head)
+
+Selected pair similarities (for sanity):
+  sim(J01,04) = 0.0375
+  sim(J04,07) = 0.7555
+  sim(J07,10) = 0.8954
+  sim(J02,05) = 0.0315
+  sim(J05,08) = 0.8296
+  sim(J08,11) = 0.9164
+  sim(J13,16) = 0.8814
+  sim(J16,18) = 0.8342
+  sim(J18,20) = 0.7807
+  sim(J14,17) = 0.6421
+  sim(J17,19) = 0.4827
+  sim(J19,21) = 0.8833

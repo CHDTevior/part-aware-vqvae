@@ -6,7 +6,8 @@ Key differences vs old script:
 1) uses relative-to-parent motion activations to reduce root/global-motion bias,
 2) uses lagged absolute correlation for phase-shifted coupling,
 3) applies kinematic chain post-processing constraints for control stability,
-4) optionally keeps feet contact dims as a standalone part.
+4) optionally keeps feet contact dims as a standalone part,
+5) supports optional bridge-overlap post-processing across parts.
 """
 
 import argparse
@@ -31,6 +32,33 @@ T2M_CHAINS = {
     "spine": [3, 6, 9, 12, 15],
     "left_arm": [13, 16, 18, 20],
     "right_arm": [14, 17, 19, 21],
+}
+
+# Canonical 22-joint parent map used by this script.
+# Keep this explicit (instead of only implicit chain expansion) for reproducibility audits.
+T2M_PARENT_MAP = {
+    0: -1,
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 1,
+    5: 2,
+    6: 3,
+    7: 4,
+    8: 5,
+    9: 6,
+    10: 7,
+    11: 8,
+    12: 9,
+    13: 9,
+    14: 9,
+    15: 12,
+    16: 13,
+    17: 14,
+    18: 16,
+    19: 17,
+    20: 18,
+    21: 19,
 }
 
 # Minimal hard constraints for control-oriented partitioning
@@ -67,6 +95,68 @@ JOINT_NAMES = [
 ]
 
 
+def _add_dims_to_part(part_seg, part_idx, dims):
+    merged = sorted(set(part_seg[part_idx]).union(dims))
+    added = len(merged) - len(part_seg[part_idx])
+    part_seg[part_idx] = merged
+    return added
+
+
+def apply_overlap_preset(part_seg, labels, joint_to_dims, preset="none"):
+    """
+    Add controlled dim overlap across bridge joints.
+    Returns updated part_seg and overlap events.
+    """
+    if preset in (None, "none"):
+        return part_seg, []
+
+    labels_arr = np.asarray(labels, dtype=np.int32)
+    if labels_arr.shape[0] != JOINTS_NUM:
+        raise RuntimeError("labels length mismatch when applying overlap preset")
+
+    out = [list(p) for p in part_seg]
+    events = []
+
+    # boundary_v1 focuses on bridge points:
+    # - pelvis/spine to both leg chains
+    # - upper spine/neck between torso and head
+    # - collar-to-neck bridge for arm/neck continuity
+    if preset == "boundary_v1":
+        rules = [
+            (0, [1, 2]),       # root -> both hips (leg upstream)
+            (3, [1, 2, 6]),    # spine1 -> both legs + spine2
+            (6, [1, 2, 12]),   # spine2 -> legs + neck
+            (12, [6, 15]),     # neck -> spine2/head
+            (13, [12]),        # left collar -> neck
+            (14, [12]),        # right collar -> neck
+        ]
+    else:
+        raise ValueError(f"Unsupported overlap preset: {preset}")
+
+    for source_joint, target_joints in rules:
+        source_part = int(labels_arr[source_joint])
+        source_dims = joint_to_dims[source_joint]["all"]
+        for target_joint in target_joints:
+            target_part = int(labels_arr[target_joint])
+            if target_part == source_part:
+                continue
+            added = _add_dims_to_part(out, target_part, source_dims)
+            if added > 0:
+                events.append(
+                    {
+                        "source_joint": int(source_joint),
+                        "source_joint_name": JOINT_NAMES[source_joint],
+                        "source_part": int(source_part),
+                        "target_joint": int(target_joint),
+                        "target_joint_name": JOINT_NAMES[target_joint],
+                        "target_part": int(target_part),
+                        "added_dims": int(added),
+                    }
+                )
+
+    return [sorted(set(p)) for p in out], events
+
+
 def get_joint_dims(joint_id):
     """Return dim indices for one joint in HumanML3D 263-dim vector."""
     if joint_id == 0:
@@ -99,19 +189,8 @@ def get_feet_dims():
 
 
 def build_parent_map():
-    """Build parent index map for t2m 22-joint skeleton."""
-    parent = {0: -1}
-    all_chains = [
-        [0, 2, 5, 8, 11],
-        [0, 1, 4, 7, 10],
-        [0, 3, 6, 9, 12, 15],
-        [9, 14, 17, 19, 21],
-        [9, 13, 16, 18, 20],
-    ]
-    for chain in all_chains:
-        for p, c in zip(chain[:-1], chain[1:]):
-            parent[c] = p
-
+    """Return explicit parent map for t2m 22-joint skeleton."""
+    parent = dict(T2M_PARENT_MAP)
     missing = [j for j in range(JOINTS_NUM) if j not in parent]
     if missing:
         raise RuntimeError(f"Parent map missing joints: {missing}")
@@ -167,12 +246,21 @@ def compute_per_dim_stats(motions):
     return mean, std, var
 
 
-def _joint_feature_sequence(motion, joint_id, joint_to_dims, parent_map, mode):
+def _joint_feature_sequence(
+    motion,
+    joint_id,
+    joint_to_dims,
+    parent_map,
+    mode,
+    parent_delta_rot=False,
+    parent_delta_vel=False,
+):
     """
     Build per-frame feature sequence used for activation.
 
     mode='absolute': use this joint's native dims.
-    mode='relative_parent': use child-parent deltas for ric/rot/vel blocks.
+    mode='relative_parent': use child-parent deltas for ric block.
+    For HumanML3D 263-dim semantics, rot6d/vel parent-delta is off by default.
     """
     dims = joint_to_dims[joint_id]
 
@@ -191,30 +279,38 @@ def _joint_feature_sequence(motion, joint_id, joint_to_dims, parent_map, mode):
     child_vel = motion[:, dims["vel"]]
 
     if p <= 0:
-        # parent is root: ric is already root-relative, keep as-is.
+        # Parent is root or invalid: ric is already root-relative, keep as-is.
         rel_ric = child_ric
+        rel_rot = child_rot
+        rel_vel = child_vel
+    else:
+        p_dims = joint_to_dims[p]
+        p_ric = motion[:, p_dims["ric"]]
+        rel_ric = child_ric - p_ric
 
-        if p == 0:
-            p_vel = motion[:, joint_to_dims[0]["vel"]]
+        if parent_delta_rot:
+            p_rot = motion[:, p_dims["rot"]]
+            rel_rot = child_rot - p_rot
+        else:
+            rel_rot = child_rot
+
+        if parent_delta_vel:
+            p_vel = motion[:, p_dims["vel"]]
             rel_vel = child_vel - p_vel
         else:
             rel_vel = child_vel
 
-        rel_rot = child_rot
-    else:
-        p_dims = joint_to_dims[p]
-        p_ric = motion[:, p_dims["ric"]]
-        p_rot = motion[:, p_dims["rot"]]
-        p_vel = motion[:, p_dims["vel"]]
-
-        rel_ric = child_ric - p_ric
-        rel_rot = child_rot - p_rot
-        rel_vel = child_vel - p_vel
-
     return np.concatenate([rel_ric, rel_rot, rel_vel], axis=1)
 
 
-def compute_joint_activations(motions, joint_to_dims, parent_map, feature_mode="relative_parent"):
+def compute_joint_activations(
+    motions,
+    joint_to_dims,
+    parent_map,
+    feature_mode="relative_parent",
+    parent_delta_rot=False,
+    parent_delta_vel=False,
+):
     """
     Return activation matrix shape (N_total_frames, 22), each column a joint activation.
     activation = L2 norm of selected per-frame feature vector.
@@ -232,6 +328,8 @@ def compute_joint_activations(motions, joint_to_dims, parent_map, feature_mode="
                 joint_to_dims=joint_to_dims,
                 parent_map=parent_map,
                 mode=feature_mode,
+                parent_delta_rot=parent_delta_rot,
+                parent_delta_vel=parent_delta_vel,
             )
             acts[:, j] = np.linalg.norm(feat, axis=1)
 
@@ -299,6 +397,8 @@ def compute_similarity_matrix(activation_mat, max_lag=4, eps=1e-8):
 
 
 def hierarchical_cluster(similarity, n_parts=6, method="average"):
+    if method == "ward":
+        raise ValueError("ward requires Euclidean-space assumptions; not valid for corr-based distance.")
     dist = 1.0 - similarity
     np.fill_diagonal(dist, 0.0)
     dist_condensed = squareform(dist, checks=False)
@@ -307,17 +407,36 @@ def hierarchical_cluster(similarity, n_parts=6, method="average"):
     return labels, Z
 
 
-def enforce_chain_constraints(labels, chain_defs):
+def enforce_chain_constraints(labels, chain_defs, strategy="majority", similarity=None):
     """
     Force each chain's joints to share one label.
-    Use distal joint's label as the target label to bias toward control endpoint semantics.
+    strategy:
+      - majority: use the dominant label in the chain (default, robust)
+      - medoid: use label of medoid joint under similarity matrix
+      - distal: use distal joint label (legacy behavior)
     """
     out = labels.copy()
     changes = []
 
     for chain_name, chain in chain_defs.items():
         old_chain_labels = [int(out[j]) for j in chain]
-        target = int(out[chain[-1]])
+        if strategy == "distal":
+            target = int(out[chain[-1]])
+        elif strategy == "medoid" and similarity is not None:
+            chain_arr = np.array(chain, dtype=np.int32)
+            sub_sim = similarity[np.ix_(chain_arr, chain_arr)]
+            medoid_idx = int(np.argmax(np.mean(sub_sim, axis=1)))
+            target = int(out[int(chain_arr[medoid_idx])])
+        else:
+            # majority (default). Tie-break: earliest appearance along chain.
+            uniq, counts = np.unique(old_chain_labels, return_counts=True)
+            max_count = int(np.max(counts))
+            candidates = [int(u) for u, c in zip(uniq, counts) if int(c) == max_count]
+            if len(candidates) == 1:
+                target = candidates[0]
+            else:
+                target = next(lbl for lbl in old_chain_labels if lbl in candidates)
+
         for j in chain:
             out[j] = target
         if len(set(old_chain_labels)) > 1:
@@ -327,6 +446,7 @@ def enforce_chain_constraints(labels, chain_defs):
                     "joints": chain,
                     "old_labels": old_chain_labels,
                     "new_label": target,
+                    "strategy": strategy,
                 }
             )
 
@@ -452,6 +572,32 @@ def labels_to_part_seg(labels, joint_to_dims, add_contact_part=True):
     return part_seg, part_joint_list
 
 
+def build_part_joint_views(labels, n_parts, overlap_events):
+    """
+    Build part-level joint views:
+    - base: joints originally assigned by cluster labels
+    - overlap_sources: source joints that injected dims into this part via overlap
+    - effective: union(base, overlap_sources)
+    """
+    labels_arr = np.asarray(labels, dtype=np.int32)
+    base = [[] for _ in range(n_parts)]
+    for j in range(JOINTS_NUM):
+        p = int(labels_arr[j])
+        if 0 <= p < n_parts:
+            base[p].append(int(j))
+
+    overlap_sources = [set() for _ in range(n_parts)]
+    for ev in overlap_events:
+        tgt = int(ev["target_part"])
+        src = int(ev["source_joint"])
+        if 0 <= tgt < n_parts:
+            overlap_sources[tgt].add(src)
+
+    overlap_sources = [sorted(s) for s in overlap_sources]
+    effective = [sorted(set(base[i]).union(overlap_sources[i])) for i in range(n_parts)]
+    return base, overlap_sources, effective
+
+
 def save_dendrogram(Z, out_path):
     try:
         import matplotlib
@@ -470,7 +616,15 @@ def save_dendrogram(Z, out_path):
         print(f"[warn] Failed to save dendrogram: {exc}")
 
 
-def save_leg_activation_plot(motions, joint_to_dims, parent_map, feature_mode, out_path):
+def save_leg_activation_plot(
+    motions,
+    joint_to_dims,
+    parent_map,
+    feature_mode,
+    out_path,
+    parent_delta_rot=False,
+    parent_delta_vel=False,
+):
     if not motions:
         return
 
@@ -493,7 +647,15 @@ def save_leg_activation_plot(motions, joint_to_dims, parent_map, feature_mode, o
     def chain_acts(chain):
         out = []
         for j in chain:
-            feat = _joint_feature_sequence(motion, j, joint_to_dims, parent_map, feature_mode)
+            feat = _joint_feature_sequence(
+                motion=motion,
+                joint_id=j,
+                joint_to_dims=joint_to_dims,
+                parent_map=parent_map,
+                mode=feature_mode,
+                parent_delta_rot=parent_delta_rot,
+                parent_delta_vel=parent_delta_vel,
+            )
             out.append(np.linalg.norm(feat, axis=1))
         return out
 
@@ -530,8 +692,14 @@ def build_report(
     labels,
     part_seg,
     part_joint_list,
+    part_joints_base,
+    part_joints_overlap_sources,
+    part_joints_effective,
     post_changes,
     similarity,
+    parent_map,
+    overlap_preset,
+    overlap_events,
     output_dir,
 ):
     lines = []
@@ -539,10 +707,16 @@ def build_report(
     lines.append(f"Data root: {args.data_root}")
     lines.append(f"Motions loaded: {len(motions)}")
     lines.append(f"Feature mode: {args.feature_mode}")
+    lines.append(f"Parent delta rot6d: {args.parent_delta_rot}")
+    lines.append(f"Parent delta vel: {args.parent_delta_vel}")
     lines.append(f"Lagged correlation max_lag: {args.max_lag}")
     lines.append(f"Initial cluster method: {args.method}")
+    lines.append(f"Chain target mode: {args.chain_target_mode}")
     lines.append(f"Target n_parts: {args.n_parts}")
     lines.append(f"Standalone contact part: {args.add_contact_part}")
+    lines.append(f"Overlap preset: {overlap_preset}")
+    parent_map_str = ", ".join([f"{k}->{parent_map[k]}" for k in sorted(parent_map.keys())])
+    lines.append(f"Parent map (joint->parent): {parent_map_str}")
     lines.append("")
 
     lines.append("Post-processing chain fixes:")
@@ -555,18 +729,49 @@ def build_report(
             )
 
     lines.append("")
+    lines.append("Overlap events:")
+    if not overlap_events:
+        lines.append("  (none)")
+    else:
+        for e in overlap_events:
+            lines.append(
+                "  - "
+                f"{e['source_joint_name']}[J{e['source_joint']:02d}, part {e['source_part']}] -> "
+                f"{e['target_joint_name']}[J{e['target_joint']:02d}, part {e['target_part']}], "
+                f"added_dims={e['added_dims']}"
+            )
+
+    lines.append("")
     lines.append("Joint labels:")
     for j in range(JOINTS_NUM):
         lines.append(f"  J{j:02d} {JOINT_NAMES[j]:>14s} -> part {int(labels[j])}")
 
     lines.append("")
     lines.append("Part summary:")
-    for i, (dims, joints) in enumerate(zip(part_seg, part_joint_list)):
+    for i, dims in enumerate(part_seg):
+        joints = part_joints_base[i] if i < len(part_joints_base) else []
+        overlap_js = part_joints_overlap_sources[i] if i < len(part_joints_overlap_sources) else []
+        effective_js = part_joints_effective[i] if i < len(part_joints_effective) else joints
+
         if joints:
-            j_desc = ", ".join([f"J{j}({JOINT_NAMES[j]})" for j in joints])
+            base_desc = ", ".join([f"J{j}({JOINT_NAMES[j]})" for j in joints])
         else:
-            j_desc = "[contact-only dims]"
-        lines.append(f"  Part {i}: {len(dims)} dims | joints: {j_desc}")
+            base_desc = "[contact-only dims]"
+
+        if overlap_js:
+            overlap_desc = ", ".join([f"J{j}({JOINT_NAMES[j]})" for j in overlap_js])
+        else:
+            overlap_desc = "(none)"
+
+        if effective_js:
+            effective_desc = ", ".join([f"J{j}({JOINT_NAMES[j]})" for j in effective_js])
+        else:
+            effective_desc = "[contact-only dims]"
+
+        lines.append(f"  Part {i}: {len(dims)} dims")
+        lines.append(f"    base joints: {base_desc}")
+        lines.append(f"    overlap source joints: {overlap_desc}")
+        lines.append(f"    effective joints (base U overlap): {effective_desc}")
 
     lines.append("")
     lines.append("Selected pair similarities (for sanity):")
@@ -595,21 +800,49 @@ def main():
     parser.add_argument("--seed", type=int, default=1234)
 
     parser.add_argument("--n_parts", type=int, default=6)
-    parser.add_argument("--method", type=str, default="average", choices=["average", "complete", "ward"])
+    parser.add_argument("--method", type=str, default="average", choices=["average", "complete"])
     parser.add_argument("--feature_mode", type=str, default="relative_parent", choices=["absolute", "relative_parent"])
     parser.add_argument("--max_lag", type=int, default=4)
+    parser.add_argument(
+        "--parent_delta_rot",
+        action="store_true",
+        default=False,
+        help="Apply parent subtraction on rot6d in relative_parent mode (not recommended for HumanML3D).",
+    )
+    parser.add_argument(
+        "--parent_delta_vel",
+        action="store_true",
+        default=False,
+        help="Apply parent subtraction on joint velocity in relative_parent mode (off by default).",
+    )
+    parser.add_argument(
+        "--chain_target_mode",
+        type=str,
+        default="majority",
+        choices=["majority", "medoid", "distal"],
+        help="How to choose target label when enforcing each kinematic chain.",
+    )
 
     parser.add_argument("--enforce_chain_constraints", action="store_true", default=True)
     parser.add_argument("--no_enforce_chain_constraints", dest="enforce_chain_constraints", action="store_false")
 
-    parser.add_argument("--add_contact_part", action="store_true", default=True)
+    parser.add_argument("--add_contact_part", action="store_true", default=False)
     parser.add_argument("--no_add_contact_part", dest="add_contact_part", action="store_false")
 
     parser.add_argument("--sync_primary_partition", action="store_true", default=False,
                         help="Also write result to skeleton_partition.json in output_dir")
+    parser.add_argument(
+        "--overlap_preset",
+        type=str,
+        default="none",
+        choices=["none", "boundary_v1"],
+        help="Optional post-process overlap across bridge joints.",
+    )
 
     parser.add_argument("--output_dir", type=str, default="./partition_analysis")
     args = parser.parse_args()
+    if args.method == "ward":
+        raise ValueError("ward requires Euclidean-space assumptions; choose average or complete.")
 
     np.random.seed(args.seed)
     os.makedirs(args.output_dir, exist_ok=True)
@@ -637,6 +870,8 @@ def main():
         joint_to_dims=joint_to_dims,
         parent_map=parent_map,
         feature_mode=args.feature_mode,
+        parent_delta_rot=args.parent_delta_rot,
+        parent_delta_vel=args.parent_delta_vel,
     )
 
     activation_sample = maybe_subsample_frames(activation_mat, args.max_frames, args.seed)
@@ -656,7 +891,12 @@ def main():
     )
 
     if args.enforce_chain_constraints:
-        labels, post_changes = enforce_chain_constraints(labels, CONSTRAINT_CHAINS)
+        labels, post_changes = enforce_chain_constraints(
+            labels=labels,
+            chain_defs=CONSTRAINT_CHAINS,
+            strategy=args.chain_target_mode,
+            similarity=similarity,
+        )
 
     labels = ensure_joint_cluster_count(
         labels=labels,
@@ -666,25 +906,50 @@ def main():
     )
     # Final safety pass: keep constrained chains intact after cluster-count balancing.
     if args.enforce_chain_constraints:
-        labels, _ = enforce_chain_constraints(labels, CONSTRAINT_CHAINS)
+        labels, _ = enforce_chain_constraints(
+            labels=labels,
+            chain_defs=CONSTRAINT_CHAINS,
+            strategy=args.chain_target_mode,
+            similarity=similarity,
+        )
     labels, _ = remap_labels_contiguous(labels)
 
     print("[6/7] Building partSeg and saving outputs...")
-    part_seg, part_joint_list = labels_to_part_seg(
+    part_seg_no_overlap, part_joint_list = labels_to_part_seg(
         labels=labels,
         joint_to_dims=joint_to_dims,
         add_contact_part=args.add_contact_part,
     )
+    part_seg, overlap_events = apply_overlap_preset(
+        part_seg=part_seg_no_overlap,
+        labels=labels,
+        joint_to_dims=joint_to_dims,
+        preset=args.overlap_preset,
+    )
+    part_joints_base, part_joints_overlap_sources, part_joints_effective = build_part_joint_views(
+        labels=labels,
+        n_parts=len(part_seg),
+        overlap_events=overlap_events,
+    )
 
     result = {
         "partSeg": part_seg,
+        "partSeg_no_overlap": part_seg_no_overlap,
         "n_parts": len(part_seg),
         "joint_labels": labels.tolist(),
         "cluster_method": args.method,
         "feature_mode": args.feature_mode,
         "max_lag": args.max_lag,
+        "parent_delta_rot": args.parent_delta_rot,
+        "parent_delta_vel": args.parent_delta_vel,
         "enforce_chain_constraints": args.enforce_chain_constraints,
+        "chain_target_mode": args.chain_target_mode,
         "add_contact_part": args.add_contact_part,
+        "overlap_preset": args.overlap_preset,
+        "overlap_events": overlap_events,
+        "part_joints_base": part_joints_base,
+        "part_joints_overlap_sources": part_joints_overlap_sources,
+        "part_joints_effective": part_joints_effective,
         "n_samples": len(motions),
         "n_frames_full": int(activation_mat.shape[0]),
         "n_frames_used": int(activation_sample.shape[0]),
@@ -717,6 +982,8 @@ def main():
         parent_map=parent_map,
         feature_mode=args.feature_mode,
         out_path=pjoin(args.output_dir, "leg_chain_activation_example.png"),
+        parent_delta_rot=args.parent_delta_rot,
+        parent_delta_vel=args.parent_delta_vel,
     )
 
     build_report(
@@ -725,8 +992,14 @@ def main():
         labels=labels,
         part_seg=part_seg,
         part_joint_list=part_joint_list,
+        part_joints_base=part_joints_base,
+        part_joints_overlap_sources=part_joints_overlap_sources,
+        part_joints_effective=part_joints_effective,
         post_changes=post_changes,
         similarity=similarity,
+        parent_map=parent_map,
+        overlap_preset=args.overlap_preset,
+        overlap_events=overlap_events,
         output_dir=args.output_dir,
     )
 
