@@ -12,8 +12,8 @@ tags:
 
 Public checkpoint bundle for the `part-aware-vqvae` VQ-VAE rerun `vq_overlap_top3_20260529`.
 
-Source workspace at export time: `/iridisfs/scratch/ts1v23/workspace/part-aware-vqvae`
-Training output directory: `/iridisfs/scratch/ts1v23/workspace/part-aware-vqvae/output/vq/2026-05-29-11-07-24_vq_overlap_top3_20260529`
+Source workspace at export time: `.`
+Training output directory: `./output/vq/2026-05-29-11-07-24_vq_overlap_top3_20260529`
 Git commit recorded at export time: `82d4a3f538ae8e1fc623b7c8694ba32111245062`
 
 ## Contents
@@ -29,9 +29,9 @@ Git commit recorded at export time: `82d4a3f538ae8e1fc623b7c8694ba32111245062`
 ## Reproduce Launch
 
 ```bash
-cd /scratch/ts1v23/workspace/part-aware-vqvae
+cd .
 conda activate tlcontrol
-CUDA_VISIBLE_DEVICES=0 python -u train_vq.py --dataname t2m --seed 123 --exp-name vq_overlap_top3_20260529 --nb-code 128 --partition-file /scratch/ts1v23/workspace/part-aware-vqvae/partition_analysis/skeleton_partition.json
+CUDA_VISIBLE_DEVICES=0 python -u train_vq.py --dataname t2m --seed 123 --exp-name vq_overlap_top3_20260529 --nb-code 128 --partition-file ./partition_analysis/skeleton_partition.json
 ```
 
 Important: this is the overlap-partition VQ-VAE (`partition_analysis/skeleton_partition.json`), not the MMM hardcoded/default-partition checkpoint.

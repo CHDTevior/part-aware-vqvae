@@ -19,7 +19,7 @@ from exit.utils import generate_src_mask  # 未用到，但保留
 def get_dataloaders(config, tokenizer, skip_train=False,
                     skip_valid=False, valid_seed=None):
   # 定义一个 opt 字典
-  data_root = '/scratch/ts1v23/workspace/motion-latent-diffusion-main/datasets/humanml3d/HumanML3D'
+  data_root = './dataset/HumanML3D'
   opt = {
       "max_motion_length": 210,       # int
       "dataset_name": "t2m",          # str, 可选 "t2m" 或其他
@@ -30,11 +30,11 @@ def get_dataloaders(config, tokenizer, skip_train=False,
   from argparse import Namespace
   opt = Namespace(**opt)
 
-  mean = np.load('/scratch/ts1v23/workspace/mogo_developer/checkpoints/t2m/rvq_n8192_d128/meta/mean.npy')
-  std = np.load('/scratch/ts1v23/workspace/mogo_developer/checkpoints/t2m/rvq_n8192_d128/meta/std.npy')
+  mean = np.load('./checkpoints/t2m/rvq_n8192_d128/meta/mean.npy')
+  std = np.load('./checkpoints/t2m/rvq_n8192_d128/meta/std.npy')
 
-  train_split_file = os.path.join('/scratch/ts1v23/workspace/motion-latent-diffusion-main/datasets/humanml3d/HumanML3D', 'train.txt')
-  val_split_file = os.path.join('/scratch/ts1v23/workspace/motion-latent-diffusion-main/datasets/humanml3d/HumanML3D', 'val.txt')
+  train_split_file = os.path.join('./dataset/HumanML3D', 'train.txt')
+  val_split_file = os.path.join('./dataset/HumanML3D', 'val.txt')
 
   # train_set = Text2MotionDataset(opt, mean, std, train_split_file)
   train_set = Text2MotionDataset(opt, mean, std, val_split_file)
@@ -219,7 +219,7 @@ def make_dummy_batch(batch_size, seq_len, dataname, device):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--ckpt", type=str,
-                        default="/scratch/ts1v23/workspace/MMM/output/vq/2024-06-03-20-22-07_retrain/net_last.pth")
+                        default="./output/vq/2024-06-03-20-22-07_retrain/net_last.pth")
     parser.add_argument("--device", type=str, default="cuda:0" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--batch_size", type=int, default=2)
     parser.add_argument("--seq_len", type=int, default=196)
@@ -317,7 +317,7 @@ if __name__ == "__main__":
 
 '''
 python -u test_vq.py \
-  --ckpt /scratch/ts1v23/workspace/MMM/output/vq/2024-06-03-20-22-07_retrain/net_last.pth \
+  --ckpt ./output/vq/2024-06-03-20-22-07_retrain/net_last.pth \
   --device cuda:0 \
   --batch_size 2 \
   --seq_len 192 \

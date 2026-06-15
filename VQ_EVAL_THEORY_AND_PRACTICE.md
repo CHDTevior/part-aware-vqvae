@@ -96,7 +96,7 @@ flowchart TD
 
 评估对象：
 
-- checkpoint: `/scratch/ts1v23/workspace/MMM/output/vq/2026-02-18-11-48-59_vq_data_driven/net_best_fid.pth`
+- checkpoint: `./output/vq/2026-02-18-11-48-59_vq_data_driven/net_best_fid.pth`
 
 执行方式（在现有 allocation 内跑 GPU）：
 

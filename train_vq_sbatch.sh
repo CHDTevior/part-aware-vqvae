@@ -13,7 +13,7 @@ source ~/.bashrc
 conda activate tlcontrol
 
 # 设置工作目录
-cd /scratch/ts1v23/workspace/part-aware-vqvae
+cd .
 mkdir -p logs
 
 echo "Job started at $(date)"

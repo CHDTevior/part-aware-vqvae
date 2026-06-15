@@ -5,15 +5,15 @@
 命令：
 
 ```bash
-conda run -n tlcontrol python /scratch/ts1v23/workspace/part-aware-vqvae/partition_analysis/analyze_skeleton_partition.py \
-  --data_root /scratch/ts1v23/workspace/part-aware-vqvae/dataset/HumanML3D \
+conda run -n tlcontrol python ./partition_analysis/analyze_skeleton_partition.py \
+  --data_root ./dataset/HumanML3D \
   --train_split train.txt \
   --n_parts 6 \
   --feature_mode relative_parent \
   --max_lag 4 \
   --overlap_preset boundary_v1 \
   --sync_primary_partition \
-  --output_dir /scratch/ts1v23/workspace/part-aware-vqvae/partition_analysis
+  --output_dir ./partition_analysis
 ```
 
 结果文件：

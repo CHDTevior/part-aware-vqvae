@@ -1,5 +1,5 @@
 === Control-Oriented Skeleton Partition Report ===
-Data root: /scratch/ts1v23/workspace/part-aware-vqvae/dataset/HumanML3D
+Data root: ./dataset/HumanML3D
 Motions loaded: 23368
 Feature mode: relative_parent
 Parent delta rot6d: False

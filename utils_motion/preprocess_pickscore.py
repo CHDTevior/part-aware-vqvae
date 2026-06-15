@@ -1,7 +1,7 @@
 import os, json
 
-folder_a = "/scratch/ts1v23/workspace/reward_images/good"
-folder_b = "/scratch/ts1v23/workspace/reward_images/bad"
+folder_a = "./data/reward_images/good"
+folder_b = "./data/reward_images/bad"
 output_json = "pairs.json"
 
 # 读取图片列表

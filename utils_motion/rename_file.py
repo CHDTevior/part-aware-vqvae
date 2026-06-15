@@ -14,7 +14,7 @@ def rename_images(folder, prefix=""):
     print(f"✅ Renamed {len(files)} files in {folder}")
 
 # 用法
-rename_images("/scratch/ts1v23/workspace/reward_images/good", prefix="good_")
-rename_images("/scratch/ts1v23/workspace/reward_images/bad", prefix="bad_")
+rename_images("./data/reward_images/good", prefix="good_")
+rename_images("./data/reward_images/bad", prefix="bad_")
 
-# /scratch/ts1v23/workspace/reward_images/good/good_00033.jpg
+# ./data/reward_images/good/good_00033.jpg

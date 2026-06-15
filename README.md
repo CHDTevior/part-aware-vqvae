@@ -17,7 +17,7 @@ vq_overlap_top3_20260529
 Training output directory in the original workspace:
 
 ```text
-/iridisfs/scratch/ts1v23/workspace/part-aware-vqvae/output/vq/2026-05-29-11-07-24_vq_overlap_top3_20260529
+./output/vq/2026-05-29-11-07-24_vq_overlap_top3_20260529
 ```
 
 Public Hugging Face bundle with weights, configs, logs, and code snapshot:
@@ -180,7 +180,7 @@ The historical launch used the absolute partition path from the original
 workspace:
 
 ```text
-/scratch/ts1v23/workspace/part-aware-vqvae/partition_analysis/skeleton_partition.json
+./partition_analysis/skeleton_partition.json
 ```
 
 The JSON contents are included in this repository and in the HF bundle.
