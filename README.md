@@ -1,122 +1,272 @@
-# Part-Aware VQVAE
+# Part-Aware VQ-VAE
 
-This repo packages your VAE/VQ training + evaluation code from `MMM` together with data-driven skeleton partition analysis from `MaskControl`.
+This repository contains the part-aware VQ-VAE tokenizer code used for the
+overlap-partition HumanML3D/T2M run `vq_overlap_top3_20260529`.
 
-## Included
-- VQ/VAE training: `train_vq.py`
-- VQ smoke/eval script: `test_vq.py`
-- Slurm launcher: `train_vq_sbatch.sh`
-- Core modules: `models/`, `dataset/`, `utils/`, `options/`, `exit/`
-- Partition analysis:
-  - script: `partition_analysis/analyze_skeleton_partition.py` (control-oriented, new)
-  - legacy script: `partition_analysis/old_analyze_skeleton_partition.py`
-  - partitions: `partition_analysis/skeleton_partition.json`, `partition_analysis/skeleton_partition2.json`
+This is the VQ-VAE repository only. The continuous PartVAE work is kept in the
+separate repository `CHDTevior/part-aware-partvae`.
 
-## Environment (pip-first)
-Use `conda` only to create an isolated env, then install packages via `pip`.
+## Current Reference Checkpoint
+
+Reference run:
+
+```text
+vq_overlap_top3_20260529
+```
+
+Training output directory in the original workspace:
+
+```text
+/iridisfs/scratch/ts1v23/workspace/part-aware-vqvae/output/vq/2026-05-29-11-07-24_vq_overlap_top3_20260529
+```
+
+Public Hugging Face bundle with weights, configs, logs, and code snapshot:
+
+```text
+https://huggingface.co/Tevior/part-aware-vqvae-overlap-top3-20260529
+```
+
+GitHub release assets mirror the checkpoint files:
+
+```text
+https://github.com/CHDTevior/part-aware-vqvae/releases/tag/vq-overlap-top3-20260529
+```
+
+Use `net_best_fid.pth` by default for reconstruction-FID comparisons. Use
+`net_best_top3.pth` only when selecting for R@3.
+
+## Checkpoints
+
+The released bundle contains:
+
+```text
+net_best_fid.pth
+net_best_div.pth
+net_best_top1.pth
+net_best_top3.pth
+net_best_matching.pth
+net_last.pth
+```
+
+The HF repo also includes:
+
+```text
+config/training_config.json
+config/training_eval_summary.json
+config/skeleton_partition.json
+config/launch_command.txt
+logs/run.log
+logs/train_vq_overlap_top3_20260529_20260529_100714.log
+manifest.sha256
+```
+
+For convenience, the config and partition are duplicated next to the HF
+`weights/` directory as `weights/config.json` and
+`weights/skeleton_partition.json`.
+
+## Metrics
+
+These are training-time reconstruction metrics parsed from `run.log`. They are
+not a formal 5-seed text-generation benchmark.
+
+| checkpoint / selector | iter | FID | R@1 | R@2 | R@3 | Matching | Diversity |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `net_best_fid.pth` | 165000 | 0.0153 | 0.5153 | 0.7021 | 0.7965 | 2.9400 | 9.6057 |
+| `net_best_top1.pth` | 210000 | 0.0219 | 0.5372 | 0.7081 | 0.8012 | 2.9300 | 9.6410 |
+| `net_best_top3.pth` | 60000 | 0.0366 | 0.5160 | 0.7154 | 0.8112 | 2.9063 | 9.3176 |
+| `net_best_matching.pth` | 160000 | 0.0426 | 0.5312 | 0.7114 | 0.8052 | 2.8848 | 9.5794 |
+| `net_last.pth` | 300000 | 0.0209 | 0.5140 | 0.7114 | 0.7999 | 2.9161 | 9.3756 |
+
+Final train line:
+
+```text
+iter=300000, Recons=0.02611, PPL=83.99, Commit=0.89492
+```
+
+## Exact Training Config
+
+```text
+dataname=t2m
+exp_name=vq_overlap_top3_20260529
+partition_file=partition_analysis/skeleton_partition.json
+nb_code=128
+code_dim=128
+output_emb_width=128
+batch_size=256
+window_size=64
+lr=2e-4
+total_iter=300000
+warm_up_iter=1000
+lr_scheduler=[200000]
+gamma=0.05
+weight_decay=0.0
+commit=0.02
+loss_vel=0.5
+recons_loss=l1_smooth
+down_t=2
+stride_t=2
+width=512
+depth=3
+dilation_growth_rate=3
+vq_act=relu
+vq_norm=null
+quantizer=ema_reset
+mu=0.99
+beta=1.0
+sep_uplow=false
+seed=123
+eval_iter=5000
+print_iter=200
+```
+
+Important: this checkpoint uses the overlap JSON partition
+`partition_analysis/skeleton_partition.json`. Do not run it as the MMM
+hardcoded/default-partition checkpoint, and do not leave `--partition-file`
+empty for this run.
+
+## Environment
+
+The original environment was `tlcontrol`. A reproducibility snapshot is stored
+in `environment.yml`.
+
+Minimal setup:
 
 ```bash
-# 1) Create and activate env
-conda create -n tlcontrol python=3.10 -y
+conda env create -f environment.yml
 conda activate tlcontrol
-
-# 2) Install PyTorch (CUDA 11.8 example)
-pip install --upgrade pip
-pip install torch==2.3.0 torchvision==0.18.0 --index-url https://download.pytorch.org/whl/cu118
-
-# 3) Install project dependencies
-pip install -r environment.txt
 ```
 
-If you use a different CUDA version, replace step 2 with the matching PyTorch command from pytorch.org.
+If you build a lighter environment manually, you still need PyTorch, NumPy,
+SciPy, scikit-learn, tqdm, TensorBoard, and the HumanML3D evaluator
+dependencies used by this codebase.
 
-## Quick Start
-1. For large datasets, use symlinks instead of copying:
+## Data and Evaluator Assets
 
-```bash
-scripts/link_large_data.sh /path/to/HumanML3D
+The training and eval scripts expect the same local layout as the original
+project:
+
+```text
+dataset/HumanML3D/
+glove/
+checkpoints/t2m/Comp_v6_KLD005/
+checkpoints/t2m/text_mot_match/model/finest.tar
 ```
 
-2. Link shared training assets (`glove`, `checkpoints`) from your existing workspace:
+`dataset/HumanML3D/` should contain the HumanML3D motion/text split files used
+by the original MMM/T2M setup. `glove/` should contain
+`our_vab_*.{npy,pkl}`. The evaluator checkpoints are required for FID,
+diversity, R-precision, and matching score.
+
+## Reproduce Training
+
+From the repository root:
 
 ```bash
-ln -sfn /your/path/to/MMM/glove glove
-ln -sfn /your/path/to/MMM/checkpoints checkpoints
+bash scripts/launch_vq_overlap_top3_20260529.sh
 ```
 
-3. Run partition analysis if needed:
+Equivalent explicit command:
 
 ```bash
-python partition_analysis/analyze_skeleton_partition.py \
-  --data_root ./dataset/HumanML3D \
-  --n_parts 6 \
-  --feature_mode relative_parent \
-  --max_lag 4 \
-  --add_contact_part \
-  --sync_primary_partition \
-  --output_dir ./partition_analysis
-```
-
-4. Optional smoke test (no full training):
-
-```bash
-python scripts/smoke_test.py --device cpu
-```
-
-5. Offline evaluation + visualization (encoder latent / quantized latent / codebook / collapse diagnostics):
-
-```bash
-python scripts/offline_vq_eval.py \
-  --ckpt output/vq/<your_run>/net_last.pth \
-  --device cuda \
-  --num-batches 40 \
-  --out-dir offline_eval/<eval_name>
-```
-
-Run training-style metrics (FID/diversity/R-precision) in the same script:
-
-```bash
-python scripts/offline_vq_eval.py \
-  --ckpt output/vq/<your_run>/net_last.pth \
-  --device cuda \
-  --run-training-style-eval \
-  --out-dir offline_eval/<eval_name>
-```
-
-Generated files include:
-- `encoder_latent_pca.png` (Choice 1: pre-quant encoder manifold)
-- `quantized_latent_pca.png` (Choice 2: post-quant latent clusters)
-- `codebook_pca.png` (Choice 3: codebook health, dead codes marked as `x`)
-- `code_usage_heatmap.png` (usage concentration / dead-code risk)
-- `recon_vs_commit.png` (commit vs recon relationship)
-- `nn_recon_ratio_hist.png` (nearest-neighbor reconstruction collapse check)
-- `metrics.json` (all numeric diagnostics: perplexity, dead codes, commit/recon, duplicates, nn checks, optional FID/diversity/top-k)
-
-6. Train part-aware VQ-VAE:
-
-```bash
-python -u train_vq.py \
+CUDA_VISIBLE_DEVICES=0 python -u train_vq.py \
   --dataname t2m \
-  --exp-name vq_data_driven \
+  --seed 123 \
+  --exp-name vq_overlap_top3_20260529 \
+  --nb-code 128 \
+  --partition-file ./partition_analysis/skeleton_partition.json
+```
+
+The historical launch used the absolute partition path from the original
+workspace:
+
+```text
+/scratch/ts1v23/workspace/part-aware-vqvae/partition_analysis/skeleton_partition.json
+```
+
+The JSON contents are included in this repository and in the HF bundle.
+
+## Offline Evaluation
+
+Download the HF bundle or place a checkpoint under `output/vq/...`, then run:
+
+```bash
+python scripts/offline_vq_eval.py \
+  --ckpt /path/to/net_best_fid.pth \
   --partition-file ./partition_analysis/skeleton_partition.json \
-  --stride-t 2
+  --nb-code 128 \
+  --code-dim 128 \
+  --output-emb-width 128 \
+  --down-t 2 \
+  --stride-t 2 \
+  --run-training-style-eval \
+  --out-dir offline_eval/vq_overlap_top3_20260529_best_fid
 ```
 
-7. Slurm run:
+For latent/codebook diagnostics without the full training-style eval:
 
 ```bash
-sbatch train_vq_sbatch.sh
+python scripts/offline_vq_eval.py \
+  --ckpt /path/to/net_best_fid.pth \
+  --partition-file ./partition_analysis/skeleton_partition.json \
+  --nb-code 128 \
+  --code-dim 128 \
+  --output-emb-width 128 \
+  --down-t 2 \
+  --stride-t 2 \
+  --num-batches 40 \
+  --out-dir offline_eval/vq_overlap_top3_20260529_latent_diag
 ```
 
-## Notes
-- Code is intentionally kept close to your original implementation for reproducibility.
-- `partition-file` is optional. Without it, the fallback static partition in `models/vqvae.py` is used.
-- Real training requires `glove/our_vab_*.{npy,pkl}` and `checkpoints/t2m/Comp_v6_KLD005/opt.txt`.
-- If `sbatch` is pending with `QOSMaxNodePerUserLimit`, run inside an existing allocation instead:
+## Loading Checkpoint
 
-```bash
-srun --jobid=<running_jobid> --ntasks=1 --gres=gpu:1 --cpus-per-task=16 --mem=120G \
-  bash -lc 'source ~/.bashrc && conda activate tlcontrol && cd /path/to/part-aware-vqvae && python -u train_vq.py ...'
+```python
+import json
+import torch
+from types import SimpleNamespace
+
+from models.vqvae import HumanVQVAE
+
+with open("configs/vq_overlap_top3_20260529_training_config.json", "r", encoding="utf-8") as f:
+    cfg = json.load(f)
+
+args = SimpleNamespace(**cfg)
+args.partition_file = "./partition_analysis/skeleton_partition.json"
+
+model = HumanVQVAE(
+    args,
+    nb_code=cfg["nb_code"],
+    code_dim=cfg["code_dim"],
+    output_emb_width=cfg["output_emb_width"],
+    down_t=cfg["down_t"],
+    stride_t=cfg["stride_t"],
+    width=cfg["width"],
+    depth=cfg["depth"],
+    dilation_growth_rate=cfg["dilation_growth_rate"],
+    activation=cfg["vq_act"],
+    norm=cfg["vq_norm"],
+)
+
+ckpt = torch.load("weights/net_best_fid.pth", map_location="cpu", weights_only=False)
+state_dict = ckpt["net"] if isinstance(ckpt, dict) and "net" in ckpt else ckpt
+model.load_state_dict(state_dict, strict=True)
+model.eval()
 ```
 
-- Keep `--ntasks=1` for single-process training to avoid duplicate process collisions on output folders.
+The current quantizer implementation allocates its codebook with `.cuda()` at
+initialization time, matching the original training code. Instantiate on a CUDA
+machine for normal use.
+
+## Repository Files Added for This Release
+
+```text
+configs/vq_overlap_top3_20260529_training_config.json
+configs/vq_overlap_top3_20260529_training_eval_summary.json
+configs/vq_overlap_top3_20260529_launch_command.txt
+configs/vq_overlap_top3_20260529_skeleton_partition.json
+docs/vq_overlap_top3_20260529_metrics.md
+docs/vq_overlap_top3_20260529_hf_model_card.md
+scripts/launch_vq_overlap_top3_20260529.sh
+```
+
+`utils/eval_trans.py` is updated so the R@3 selector also saves
+`net_best_top3.pth`.

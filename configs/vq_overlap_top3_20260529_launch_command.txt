@@ -1,0 +1,1 @@
+CUDA_VISIBLE_DEVICES=0 python -u train_vq.py --dataname t2m --seed 123 --exp-name vq_overlap_top3_20260529 --nb-code 128 --partition-file /scratch/ts1v23/workspace/part-aware-vqvae/partition_analysis/skeleton_partition.json

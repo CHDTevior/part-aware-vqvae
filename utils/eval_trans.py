@@ -150,6 +150,8 @@ def evaluation_vqvae(out_dir, val_loader, net, logger, writer, nb_iter, best_fid
         msg = f"--> --> \t Top3 Improved from {best_top3:.4f} to {R_precision[2]:.4f} !!!"
         logger.info(msg)
         best_top3 = R_precision[2]
+        if save:
+            torch.save({'net' : net.state_dict()}, os.path.join(out_dir, 'net_best_top3.pth'))
     
     if matching_score_pred < best_matching : 
         msg = f"--> --> \t matching_score Improved from {best_matching:.5f} to {matching_score_pred:.5f} !!!"
